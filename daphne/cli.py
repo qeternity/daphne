@@ -130,6 +130,12 @@ class CommandLineInterface(object):
             default=None,
         )
         self.parser.add_argument(
+            "--ws-compress",
+            type=bool,
+            help="Enable permessage-deflate websocket extension",
+            default=True,
+        )
+        self.parser.add_argument(
             "--asgi-protocol",
             dest="asgi_protocol",
             help="The version of the ASGI protocol to use",
@@ -299,6 +305,7 @@ class CommandLineInterface(object):
             if access_log_stream
             else None,
             ws_protocols=args.ws_protocols,
+            ws_compress=args.ws_compress,
             root_path=args.root_path,
             verbosity=args.verbosity,
             proxy_forwarded_address_header=self._get_forwarded_host(args=args),

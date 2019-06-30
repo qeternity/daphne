@@ -23,6 +23,9 @@ import time
 import traceback
 from concurrent.futures import CancelledError
 
+from autobahn.websocket.compress import (
+    PerMessageDeflateOffer, PerMessageDeflateOfferAccept
+)
 from twisted.internet import defer, reactor
 from twisted.internet.endpoints import serverFromString
 from twisted.logger import STDLibLogObserver, globalLogBeginner
@@ -57,6 +60,7 @@ class Server(object):
         server_name="Daphne",
         # Deprecated and does not work, remove in version 2.2
         ws_protocols=None,
+        ws_compress=True,
     ):
         self.application = application
         self.endpoints = endpoints or []
@@ -79,6 +83,7 @@ class Server(object):
         self.abort_start = False
         self.ready_callable = ready_callable
         self.server_name = server_name
+        self.ws_compress = ws_compress
         # Check our construction is actually sensible
         if not self.endpoints:
             logger.error("No endpoints. This server will not listen on anything.")
@@ -90,11 +95,18 @@ class Server(object):
         # Make the factory
         self.http_factory = HTTPFactory(self)
         self.ws_factory = WebSocketFactory(self, server=self.server_name)
-        self.ws_factory.setProtocolOptions(
-            autoPingTimeout=self.ping_timeout,
-            allowNullOrigin=True,
-            openHandshakeTimeout=self.websocket_handshake_timeout,
-        )
+        protocol_options = {
+            'autoPingTimeout': self.ping_timeout,
+            'allowNullOrigin': True,
+            'openHandshakeTimeout': self.websocket_handshake_timeout
+        }
+        if self.ws_compress:
+            def ws_accept_compression(offers):
+                for offer in offers:
+                    if isinstance(offer, PerMessageDeflateOffer):
+                        return PerMessageDeflateOfferAccept(offer)
+            protocol_options['perMessageCompressionAccept'] = ws_accept_compression
+        self.ws_factory.setProtocolOptions(**protocol_options)
         if self.verbosity <= 1:
             # Redirect the Twisted log to nowhere
             globalLogBeginner.beginLoggingTo(
